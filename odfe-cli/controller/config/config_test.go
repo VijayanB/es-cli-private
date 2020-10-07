@@ -67,6 +67,10 @@ func TestControllerWrite(t *testing.T) {
 		f, err := ioutil.TempFile(os.TempDir(), "config")
 		assert.NoError(t, err)
 		defer func() {
+			if _, err := os.Stat(f.Name()); os.IsNotExist(err) {
+				// file doesn't exist
+				return
+			}
 			err = os.Remove(f.Name())
 			assert.NoError(t, err)
 		}()
