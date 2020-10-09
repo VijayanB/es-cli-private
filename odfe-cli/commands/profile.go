@@ -30,6 +30,7 @@ import (
 
 const (
 	createNewProfileCommandName = "create"
+	deleteProfileCommandName    = "delete"
 	profileCommandName          = "profile"
 )
 
@@ -47,7 +48,8 @@ var profileCommand = &cobra.Command{
 var createProfileCmd = &cobra.Command{
 	Use:   createNewProfileCommandName,
 	Short: "Creates a new named profile",
-	Long:  `Creates a new named profile with details like name, endpoint, user and password`,
+	Long: fmt.Sprintf("Description:\n  " +
+		`Creates a new named profile with details like name, endpoint, user and password`),
 	Run: func(cmd *cobra.Command, args []string) {
 		cfgFile, err := GetRoot().Flags().GetString(flagConfig)
 		if err != nil {
@@ -62,20 +64,54 @@ var createProfileCmd = &cobra.Command{
 	},
 }
 
+//deleteProfileCmd deletes profiles by names
+var deleteProfileCmd = &cobra.Command{
+	Use:   deleteProfileCommandName + " profile_name ...",
+	Short: "Deletes profiles by names",
+	Long: fmt.Sprintf("Description:\n  " +
+		`Deletes profiles by names if it exists in config file, permanently`),
+	Run: func(cmd *cobra.Command, args []string) {
+		if len(args) < 1 {
+			fmt.Println(cmd.Usage())
+			return
+		}
+		cfgFile, err := GetRoot().Flags().GetString(flagConfig)
+		if err != nil {
+			DisplayError(err, createNewProfileCommandName)
+			return
+		}
+		err = DeleteProfile(cfgFile, args)
+		if err != nil {
+			DisplayError(err, deleteProfileCommandName)
+			return
+		}
+	},
+}
+
 // init to register commands to its parent command to create a hierarchy
 func init() {
 	profileCommand.AddCommand(createProfileCmd)
+	profileCommand.AddCommand(deleteProfileCmd)
 	GetRoot().AddCommand(profileCommand)
+}
+
+//getProfileController gets profile controller by wiring config controller with config file
+func getProfileController(cfgFlagValue string) (profile.Controller, error) {
+	configFilePath, err := GetConfigFilePath(cfgFlagValue)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get config file due to: %w", err)
+	}
+	configController := config.New(configFilePath)
+	profileController := profile.New(configController)
+	return profileController, nil
 }
 
 // CreateProfile creates a new named profile
 func CreateProfile(cfgFlagValue string, getNewProfile func(map[string]entity.Profile) entity.Profile) error {
-	configFilePath, err := GetConfigFilePath(cfgFlagValue)
+	profileController, err := getProfileController(cfgFlagValue)
 	if err != nil {
-		return fmt.Errorf("failed to get config file due to: %w", err)
+		return err
 	}
-	configController := config.New(configFilePath)
-	profileController := profile.New(configController)
 	profiles, err := profileController.GetProfilesMap()
 	if err != nil {
 		return fmt.Errorf("failed to get profile names due to: %w", err)
@@ -96,7 +132,7 @@ func getNewProfile(profileMap map[string]entity.Profile) entity.Profile {
 		if _, ok := profileMap[name]; !ok {
 			break
 		}
-		fmt.Println("profile ", name, "already exists.")
+		fmt.Println("profile", name, "already exists.")
 	}
 	fmt.Printf("Elasticsearch Endpoint: ")
 	endpoint := getUserInputAsText(checkInputIsNotEmpty)
@@ -146,4 +182,12 @@ func getUserInputAsMaskedText(isValid func(string) bool) string {
 	}
 	fmt.Println()
 	return value
+}
+
+func DeleteProfile(cfgFlagValue string, names []string) error {
+	profileController, err := getProfileController(cfgFlagValue)
+	if err != nil {
+		return err
+	}
+	return profileController.DeleteProfile(names)
 }
