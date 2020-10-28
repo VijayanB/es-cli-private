@@ -316,7 +316,7 @@ func (c controller) CreateMultiEntityAnomalyDetector(ctx context.Context, reques
 		proceed = c.askForConfirmation(
 			mapper.StringToStringPtr(
 				fmt.Sprintf(
-					"odfe-cli will create %d detector(s). Do you want to proceed? please type (y)es or (n)o and then press enter:",
+					"odfe-cli will create %d detector(s). Do you want to proceed? Y/N ",
 					len(filterValues),
 				),
 			),
